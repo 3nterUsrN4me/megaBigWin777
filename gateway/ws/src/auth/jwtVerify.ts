@@ -1,0 +1,52 @@
+import { jwtVerify, SignJWT } from "jose";
+import type { FastifyRequest } from "fastify";
+
+// HS256 secret — minimum 32 bytes for security.
+// In production, load from environment: JWT_SECRET must be a long random string.
+const JWT_SECRET_RAW = process.env["JWT_SECRET"] ?? "dev-secret-for-testing-CHANGE-IN-PROD!!";
+const SECRET_BYTES = new TextEncoder().encode(JWT_SECRET_RAW);
+
+export interface JwtPayload {
+  sub: string;  // playerId
+  exp?: number;
+  iat?: number;
+}
+
+/**
+ * Verifies a JWT token signed with HS256.
+ * Returns the payload on success, or `null` if the token is invalid/expired.
+ */
+export async function verifyJwt(token: string): Promise<JwtPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, SECRET_BYTES, {
+      algorithms: ["HS256"],
+    });
+    if (typeof payload["sub"] !== "string" || !payload["sub"]) return null;
+    return payload as unknown as JwtPayload;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extracts the Bearer token from an `Authorization` header.
+ * Returns `null` if the header is absent or malformed.
+ */
+export function extractBearerToken(request: FastifyRequest): string | null {
+  const auth = request.headers["authorization"];
+  if (typeof auth !== "string" || !auth.startsWith("Bearer ")) return null;
+  const token = auth.slice(7).trim();
+  return token.length > 0 ? token : null;
+}
+
+/**
+ * Development helper — creates a signed JWT for testing.
+ * Not used in production flow.
+ */
+export async function signTestJwt(playerId: string, expiresIn = "1h"): Promise<string> {
+  return new SignJWT({ sub: playerId })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(expiresIn)
+    .sign(SECRET_BYTES);
+}

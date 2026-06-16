@@ -4,7 +4,8 @@
   "private": true,
   "workspaces": [
     "contracts",
-    "services/*"
+    "services/*",
+    "gateway/*"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
