@@ -5,8 +5,10 @@ export type {
   CreateGameOk,
   CreateGameParams,
   CreateGameResult,
+  SeatBet,
   ServiceError,
   ServiceErrorCode,
+  StartMultiplayerRoundResult,
 } from "./GameService.js";
 
 export { db, closeDbPool, pool } from "./db/client.js";

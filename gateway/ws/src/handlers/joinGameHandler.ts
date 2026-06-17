@@ -6,32 +6,28 @@ import type { WsHandlerContext } from "../types.js";
 
 export { broadcastRoomState };
 
-/**
- * Legacy JOIN_GAME handler.
- *
- * Translates the old single-message join+bet into the new two-step flow:
- *   JOIN_ROOM (seat player) → PLACE_BET (record bet immediately)
- *
- * Kept so old clients and existing tests continue to work without changes.
- * New clients should send JOIN_ROOM then PLACE_BET separately.
- */
-export function handleJoinGame(
+export async function handleJoinGame(
   msg: JoinGameMessage,
   ctx: WsHandlerContext,
-): void {
+): Promise<void> {
   const { session, gameService, sessions, roomSessions } = ctx;
-  const { ws, playerId } = session;
+  const { ws, playerId, sessionId } = session;
 
-  // Phase 1 — seat the player
-  const joinResult = gameService.joinRoom({
-    tableId:  msg.tableId,
-    playerId,
-    username: session.username,
-    socketId: session.sessionId,
-  });
+  let joinResult;
+  try {
+    joinResult = await gameService.joinRoom({
+      tableId: msg.tableId,
+      playerId,
+      username: session.username,
+      socketId: sessionId,
+    });
+  } catch {
+    sendError(ws, "INTERNAL_ERROR", "Failed to join game");
+    return;
+  }
 
   if (!joinResult.ok) {
-    sendError(ws, joinResult.code as "INVALID_ACTION" | "TABLE_FULL", joinResult.message);
+    sendError(ws, joinResult.code, joinResult.message);
     return;
   }
 
@@ -39,9 +35,8 @@ export function handleJoinGame(
 
   let sids = roomSessions.get(msg.tableId);
   if (!sids) { sids = new Set(); roomSessions.set(msg.tableId, sids); }
-  sids.add(session.sessionId);
+  sids.add(sessionId);
 
-  // Personal acknowledgement
   sendJson(ws, {
     event:      "ROOM_ACK",
     v:          "1",
@@ -54,8 +49,7 @@ export function handleJoinGame(
 
   broadcastRoomState(msg.tableId, joinResult.roomState, roomSessions, sessions);
 
-  // Phase 2 — immediately place the bet (legacy clients bundle this into JOIN_GAME)
-  handlePlaceBet(
+  await handlePlaceBet(
     { event: "PLACE_BET", v: "1", tableId: msg.tableId, betAmount: msg.betAmount },
     ctx,
   );

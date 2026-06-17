@@ -6,14 +6,14 @@ import type { SocketStream } from "@fastify/websocket";
 import { verifyJwt, extractBearerToken } from "./auth/jwtVerify.js";
 import { routeMessage } from "./router/messageRouter.js";
 import { sendError, sendJson } from "./errors/errorHandler.js";
-import { InMemoryGameService } from "./gameService/InMemoryGameService.js";
+import { DbGameService } from "./gameService/DbGameService.js";
 import { HeartbeatManager } from "./heartbeat/heartbeatManager.js";
 import { logger, createSessionLogger } from "./middleware/requestLogger.js";
 import type { ClientSession } from "./types.js";
 
 // ─── Shared singletons ────────────────────────────────────────────────────────
 
-const gameService = new InMemoryGameService();
+const gameService = new DbGameService();
 const heartbeat = new HeartbeatManager();
 
 /** sessionId → ClientSession */
@@ -89,22 +89,20 @@ export async function buildServer() {
         socket.on("message", (rawData) => {
           const start = Date.now();
 
-          try {
-            routeMessage(rawData, {
-              session,
-              gameService,
-              sessions,
-              roomSessions,
-            });
-          } catch (err) {
+          void routeMessage(rawData, {
+            session,
+            gameService,
+            sessions,
+            roomSessions,
+          }).catch((err) => {
             sessionLog.error({ err }, "Unhandled error in message handler");
             sendError(socket, "INTERNAL_ERROR", "An internal server error occurred");
-          }
-
-          sessionLog.debug(
-            { durationMs: Date.now() - start },
-            "Message processed"
-          );
+          }).finally(() => {
+            sessionLog.debug(
+              { durationMs: Date.now() - start },
+              "Message processed",
+            );
+          });
         });
 
         // ── Close handler ─────────────────────────────────────────────────
@@ -131,10 +129,11 @@ export async function buildServer() {
             const delay = expiresAt - Date.now();
             sessionLog.info({ code, tableId, delayMs: delay }, "Grace period started — seat preserved");
             setTimeout(() => {
-              const removed = gameService.expireDisconnectedSeats(tableId);
-              if (removed.length > 0) {
-                sessionLog.warn({ tableId, removed }, "Grace period expired — seats removed");
-              }
+              void gameService.expireDisconnectedSeats(tableId).then((removed) => {
+                if (removed.length > 0) {
+                  sessionLog.warn({ tableId, removed }, "Grace period expired — seats removed");
+                }
+              });
             }, delay);
           }
 

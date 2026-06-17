@@ -10,20 +10,7 @@ import { handlePlayerAction } from "../handlers/playerActionHandler.js";
 import { handleLeaveGame } from "../handlers/leaveGameHandler.js";
 import type { WsHandlerContext } from "../types.js";
 
-/**
- * Central message dispatcher.
- *
- * Room state machine event routing:
- *
- *   JOIN_ROOM     → Phase 1: seat the player (WAITING_FOR_PLAYERS → BETTING)
- *   PLACE_BET     → Phase 2: record bet (BETTING → PLAYING when all bets in)
- *   RECONNECT     → Reattach after refresh; restores ROOM_STATE + GAME_STATE
- *   PLAYER_ACTION → Phase 3: HIT / STAND / DOUBLE_DOWN (PLAYING → ROUND_OVER)
- *   LEAVE_GAME    → Remove seat; refund bet if in BETTING
- *   JOIN_GAME     → Legacy alias: JOIN_ROOM + PLACE_BET in one message
- *   PING          → Heartbeat keepalive
- */
-export function routeMessage(rawData: unknown, ctx: WsHandlerContext): void {
+export async function routeMessage(rawData: unknown, ctx: WsHandlerContext): Promise<void> {
   const parsed = parseMessage(rawData);
 
   if (parsed.type === "PARSE_ERROR") {
@@ -33,32 +20,31 @@ export function routeMessage(rawData: unknown, ctx: WsHandlerContext): void {
 
   switch (parsed.type) {
     case "JOIN_ROOM":
-      handleJoinRoom(parsed.data, ctx);
+      await handleJoinRoom(parsed.data, ctx);
       break;
 
     case "JOIN_SLOT":
-      handleJoinSlot(parsed.data, ctx);
+      await handleJoinSlot(parsed.data, ctx);
       break;
 
     case "PLACE_BET":
-      handlePlaceBet(parsed.data, ctx);
+      await handlePlaceBet(parsed.data, ctx);
       break;
 
     case "RECONNECT":
-      handleReconnect(parsed.data, ctx);
+      await handleReconnect(parsed.data, ctx);
       break;
 
     case "JOIN_GAME":
-      // Legacy: seat + bet in one message
-      handleJoinGame(parsed.data, ctx);
+      await handleJoinGame(parsed.data, ctx);
       break;
 
     case "PLAYER_ACTION":
-      handlePlayerAction(parsed.data, ctx);
+      await handlePlayerAction(parsed.data, ctx);
       break;
 
     case "LEAVE_GAME":
-      handleLeaveGame(parsed.data, ctx);
+      await handleLeaveGame(parsed.data, ctx);
       break;
 
     case "PING":

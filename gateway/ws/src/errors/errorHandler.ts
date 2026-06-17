@@ -34,7 +34,7 @@ export function sendError(
  * Sends a JSON payload to a WebSocket client.
  * Never throws.
  */
-export function sendJson(ws: WebSocket, payload: Record<string, unknown>): void {
+export function sendJson(ws: WebSocket, payload: Record<string, unknown> | object): void {
   if (ws.readyState !== ws.OPEN) return;
   try {
     ws.send(JSON.stringify(payload));

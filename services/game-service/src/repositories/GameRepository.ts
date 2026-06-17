@@ -83,6 +83,40 @@ export class GameRepository {
     return row;
   }
 
+  async findAllActiveByTable(
+    tx: Transaction,
+    tableId: string,
+  ): Promise<GameRow[]> {
+    return tx
+      .select()
+      .from(games)
+      .where(
+        and(
+          eq(games.tableId, tableId),
+          ne(games.status, "FINISHED"),
+        ),
+      );
+  }
+
+  async findActiveByTableAndPlayer(
+    tx: Transaction,
+    tableId: string,
+    playerId: string,
+  ): Promise<GameRow | undefined> {
+    const [row] = await tx
+      .select()
+      .from(games)
+      .where(
+        and(
+          eq(games.tableId, tableId),
+          eq(games.playerId, playerId),
+          ne(games.status, "FINISHED"),
+        ),
+      )
+      .limit(1);
+    return row;
+  }
+
   async create(tx: Transaction, input: CreateGameInput): Promise<GameRow> {
     const [row] = await tx
       .insert(games)
