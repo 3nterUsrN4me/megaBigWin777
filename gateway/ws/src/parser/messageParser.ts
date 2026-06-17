@@ -1,8 +1,16 @@
 import {
+  joinRoomSchema,
+  joinSlotSchema,
+  placeBetSchema,
+  reconnectSchema,
   joinGameSchema,
   playerActionSchema,
   leaveGameSchema,
   pingSchema,
+  type JoinRoomMessage,
+  type JoinSlotMessage,
+  type PlaceBetMessage,
+  type ReconnectMessage,
   type JoinGameMessage,
   type PlayerActionMessage,
   type LeaveGameMessage,
@@ -12,11 +20,15 @@ import {
 // ─── Discriminated union of parsed messages ───────────────────────────────────
 
 export type ParsedMessage =
-  | { type: "JOIN_GAME"; data: JoinGameMessage }
+  | { type: "JOIN_ROOM";     data: JoinRoomMessage }
+  | { type: "JOIN_SLOT";     data: JoinSlotMessage }
+  | { type: "PLACE_BET";    data: PlaceBetMessage }
+  | { type: "RECONNECT";    data: ReconnectMessage }
+  | { type: "JOIN_GAME";    data: JoinGameMessage }
   | { type: "PLAYER_ACTION"; data: PlayerActionMessage }
-  | { type: "LEAVE_GAME"; data: LeaveGameMessage }
-  | { type: "PING"; data: PingMessage }
-  | { type: "PARSE_ERROR"; code: "INVALID_MESSAGE" | "PROTOCOL_VERSION_MISMATCH"; message: string };
+  | { type: "LEAVE_GAME";   data: LeaveGameMessage }
+  | { type: "PING";         data: PingMessage }
+  | { type: "PARSE_ERROR";  code: "INVALID_MESSAGE" | "PROTOCOL_VERSION_MISMATCH"; message: string };
 
 /**
  * Parses and validates an incoming WebSocket message.
@@ -61,7 +73,40 @@ export function parseMessage(rawData: unknown): ParsedMessage {
   const event = obj["event"];
 
   switch (event) {
+    case "JOIN_ROOM": {
+      const result = joinRoomSchema.safeParse(json);
+      if (!result.success) {
+        return { type: "PARSE_ERROR", code: "INVALID_MESSAGE", message: result.error.message };
+      }
+      return { type: "JOIN_ROOM", data: result.data };
+    }
+
+    case "JOIN_SLOT": {
+      const result = joinSlotSchema.safeParse(json);
+      if (!result.success) {
+        return { type: "PARSE_ERROR", code: "INVALID_MESSAGE", message: result.error.message };
+      }
+      return { type: "JOIN_SLOT", data: result.data };
+    }
+
+    case "PLACE_BET": {
+      const result = placeBetSchema.safeParse(json);
+      if (!result.success) {
+        return { type: "PARSE_ERROR", code: "INVALID_MESSAGE", message: result.error.message };
+      }
+      return { type: "PLACE_BET", data: result.data };
+    }
+
+    case "RECONNECT": {
+      const result = reconnectSchema.safeParse(json);
+      if (!result.success) {
+        return { type: "PARSE_ERROR", code: "INVALID_MESSAGE", message: result.error.message };
+      }
+      return { type: "RECONNECT", data: result.data };
+    }
+
     case "JOIN_GAME": {
+      // Legacy alias — treat as JOIN_ROOM (betAmount ignored here; client should send PLACE_BET)
       const result = joinGameSchema.safeParse(json);
       if (!result.success) {
         return { type: "PARSE_ERROR", code: "INVALID_MESSAGE", message: result.error.message };

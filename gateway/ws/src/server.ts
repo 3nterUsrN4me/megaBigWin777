@@ -19,6 +19,9 @@ const heartbeat = new HeartbeatManager();
 /** sessionId → ClientSession */
 const sessions = new Map<string, ClientSession>();
 
+/** tableId → Set<sessionId>  — used for per-room ROOM_STATE broadcasts */
+const roomSessions = new Map<string, Set<string>>();
+
 // ─── Server factory ───────────────────────────────────────────────────────────
 
 export async function buildServer() {
@@ -63,12 +66,15 @@ export async function buildServer() {
 
         const sessionId = randomUUID();
         const { sub: playerId } = jwtPayload;
+        const username = jwtPayload.username ?? playerId;
 
         const session: ClientSession = {
           sessionId,
           playerId,
+          username,
           ws: socket,
           gameId: null,
+          tableId: null,
           lastPingAt: Date.now(),
         };
 
@@ -88,6 +94,7 @@ export async function buildServer() {
               session,
               gameService,
               sessions,
+              roomSessions,
             });
           } catch (err) {
             sessionLog.error({ err }, "Unhandled error in message handler");
@@ -105,6 +112,32 @@ export async function buildServer() {
         socket.on("close", (code, reason) => {
           sessions.delete(sessionId);
           heartbeat.unregister(sessionId);
+
+          // Remove from room broadcast map (stops receiving broadcasts immediately)
+          if (session.tableId) {
+            const sids = roomSessions.get(session.tableId);
+            if (sids) {
+              sids.delete(sessionId);
+              if (sids.size === 0) roomSessions.delete(session.tableId);
+            }
+          }
+
+          // Grace period: mark seat offline but keep it for RECONNECT_GRACE_MS.
+          // This prevents the "Alt-Tab / focus loss" scenario from instantly
+          // booting the player mid-round.
+          const disc = gameService.notifyDisconnect(sessionId);
+          if (disc.gracePeriod) {
+            const { tableId, expiresAt } = disc;
+            const delay = expiresAt - Date.now();
+            sessionLog.info({ code, tableId, delayMs: delay }, "Grace period started — seat preserved");
+            setTimeout(() => {
+              const removed = gameService.expireDisconnectedSeats(tableId);
+              if (removed.length > 0) {
+                sessionLog.warn({ tableId, removed }, "Grace period expired — seats removed");
+              }
+            }, delay);
+          }
+
           sessionLog.info({ code, reason: reason.toString() }, "WebSocket connection closed");
         });
 

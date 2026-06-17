@@ -12,37 +12,32 @@
             colors: {
               felt: {
                 DEFAULT: "#1a5c38",
-                dark: "#12401f",
-                light: "#236b44",
-                border: "#2d7a50",
+                dark:    "#12401f",
+                light:   "#236b44",
+                border:  "#2d7a50",
               },
               chip: {
                 gold: "#f5c842",
-                red: "#e03535",
+                red:  "#e03535",
               },
             },
-            fontFamily: {
-              cards: ["Georgia", "serif"],
-            },
+            fontFamily: { cards: ["Georgia", "serif"] },
             animation: {
-              "deal-in": "dealIn 0.35s ease-out",
-              "flip-card": "flipCard 0.4s ease-in-out",
+              "deal-in":    "dealIn 0.35s ease-out",
+              "flip-card":  "flipCard 0.4s ease-in-out",
               "result-pop": "resultPop 0.5s cubic-bezier(0.34,1.56,0.64,1)",
               "pulse-slow": "pulse 2.5s cubic-bezier(0.4,0,0.6,1) infinite",
+              "slot-glow":  "slotGlow 1.6s ease-in-out infinite",
             },
             keyframes: {
-              dealIn: {
-                "0%": { opacity: "0", transform: "translateY(-40px) rotate(-5deg) scale(0.8)" },
-                "100%": { opacity: "1", transform: "translateY(0) rotate(0) scale(1)" },
-              },
-              flipCard: {
-                "0%": { transform: "rotateY(90deg) scale(0.9)" },
-                "100%": { transform: "rotateY(0deg) scale(1)" },
-              },
-              resultPop: {
-                "0%": { opacity: "0", transform: "scale(0.6)" },
-                "100%": { opacity: "1", transform: "scale(1)" },
-              },
+              dealIn:    { "0%": { opacity:"0", transform:"translateY(-40px) rotate(-5deg) scale(0.8)" },
+                           "100%": { opacity:"1", transform:"translateY(0) rotate(0) scale(1)" } },
+              flipCard:  { "0%": { transform:"rotateY(90deg) scale(0.9)" },
+                           "100%": { transform:"rotateY(0deg) scale(1)" } },
+              resultPop: { "0%": { opacity:"0", transform:"scale(0.6)" },
+                           "100%": { opacity:"1", transform:"scale(1)" } },
+              slotGlow:  { "0%,100%": { boxShadow:"0 0 4px 1px rgba(45,122,80,0.4)" },
+                           "50%": { boxShadow:"0 0 14px 4px rgba(245,200,66,0.25)" } },
             },
           },
         },
@@ -50,54 +45,102 @@
     </script>
     <style>
       body { background: radial-gradient(ellipse at center, #1a5c38 0%, #0d3a22 100%); }
+
+      /* ── Cards ─────────────────────────────────────────── */
       .card {
-        width: 72px; height: 100px;
-        border-radius: 8px;
-        box-shadow: 2px 3px 8px rgba(0,0,0,0.5);
+        width: 56px; height: 80px;
+        border-radius: 7px;
+        box-shadow: 2px 3px 8px rgba(0,0,0,.5);
         display: flex; align-items: center; justify-content: center;
         font-family: Georgia, serif;
-        font-size: 1.1rem; font-weight: bold;
-        position: relative;
-        transition: transform 0.15s ease;
-        animation: dealIn 0.35s ease-out;
-        flex-shrink: 0;
+        font-size: .95rem; font-weight: bold;
+        position: relative; transition: transform .15s ease;
+        animation: dealIn .35s ease-out; flex-shrink: 0;
       }
-      .card:hover { transform: translateY(-6px); }
-      .card-face { background: #fff; color: #111; border: 1.5px solid #ddd; }
-      .card-face.red { color: #c0392b; }
+      .card:hover { transform: translateY(-5px); }
+      .card-face { background:#fff; color:#111; border:1.5px solid #ddd; }
+      .card-face.red { color:#c0392b; }
       .card-back {
-        background: linear-gradient(135deg, #1a237e 25%, #283593 25%, #283593 50%, #1a237e 50%, #1a237e 75%, #283593 75%);
-        background-size: 12px 12px;
-        border: 2px solid #3949ab;
+        background: linear-gradient(135deg,#1a237e 25%,#283593 25%,#283593 50%,#1a237e 50%,#1a237e 75%,#283593 75%);
+        background-size: 10px 10px; border: 2px solid #3949ab;
       }
-      .card-value { font-size: 1.3rem; line-height:1; }
-      .card-suit  { font-size: 1.2rem; line-height:1; }
-      .card-corner-tl { position: absolute; top:4px; left:6px; font-size:0.75rem; line-height:1.1; text-align:center; }
-      .card-corner-br { position: absolute; bottom:4px; right:6px; font-size:0.75rem; line-height:1.1; text-align:center; transform:rotate(180deg); }
+      .card-value { font-size:1.1rem; line-height:1; }
+      .card-suit  { font-size:1rem;   line-height:1; }
+      .card-corner-tl { position:absolute; top:3px; left:5px; font-size:.65rem; line-height:1.1; text-align:center; }
+      .card-corner-br { position:absolute; bottom:3px; right:5px; font-size:.65rem; line-height:1.1; text-align:center; transform:rotate(180deg); }
 
+      /* ── Slot cards (smaller for side-by-side) ────────── */
+      .slot-card { width:44px; height:62px; font-size:.8rem; border-radius:6px; }
+      .slot-card .card-corner-tl { font-size:.55rem; }
+      .slot-card .card-corner-br { font-size:.55rem; }
+      .slot-card .card-value { font-size:.9rem; }
+      .slot-card .card-suit  { font-size:.85rem; }
+
+      /* ── Table slots ───────────────────────────────────── */
+      .table-slot {
+        position: relative;
+        display: flex; flex-direction: column; align-items: center;
+        gap: 4px; padding: 8px 6px 6px;
+        border-radius: 14px;
+        min-width: 100px; max-width: 140px; flex: 1;
+        border: 1.5px dashed rgba(45,122,80,.5);
+        background: rgba(0,0,0,.15);
+        transition: border-color .2s, background .2s;
+      }
+      .table-slot.slot-self {
+        border-color: rgba(245,200,66,.6);
+        background: rgba(245,200,66,.06);
+        animation: slotGlow 1.6s ease-in-out infinite;
+      }
+      .table-slot.slot-occupied {
+        border-color: rgba(255,255,255,.18);
+        background: rgba(0,0,0,.22);
+      }
+      .table-slot.slot-active {
+        border-color: rgba(250,204,21,.9);
+        background: rgba(250,204,21,.08);
+        box-shadow: 0 0 14px 3px rgba(250,204,21,.35);
+      }
+      .table-slot.slot-bet-selected {
+        outline: 2px dashed rgba(96,165,250,.9);
+        outline-offset: 2px;
+      }
+      .table-slot.slot-empty {
+        border-style: dashed;
+        opacity: .7;
+        cursor: default;
+      }
+      .table-slot.slot-empty.slot-joinable {
+        cursor: pointer;
+        opacity: 1;
+      }
+      .table-slot.slot-empty.slot-joinable:hover {
+        border-color: rgba(245,200,66,.7);
+        background: rgba(245,200,66,.06);
+      }
+
+      /* ── Result label inside slot ──────────────────────── */
+      .slot-result-win  { color: #34d399; }
+      .slot-result-loss { color: #f87171; }
+      .slot-result-push { color: #93c5fd; }
+      .slot-result-bj   { color: #fbbf24; }
+
+      /* ── Buttons ───────────────────────────────────────── */
       .btn-action {
-        transition: all 0.15s ease;
-        user-select: none;
+        transition: all .15s ease; user-select: none;
       }
       .btn-action:not(:disabled):hover { transform: translateY(-2px); filter: brightness(1.1); }
       .btn-action:not(:disabled):active { transform: translateY(0); }
-      .btn-action:disabled { opacity: 0.35; cursor: not-allowed; }
+      .btn-action:disabled { opacity: .35; cursor: not-allowed; }
 
-      .log-entry { animation: dealIn 0.2s ease-out; }
-
-      #result-banner {
-        pointer-events: none;
-        transition: opacity 0.3s ease;
-      }
-
-      .badge-status {
-        font-size: 0.65rem;
-        letter-spacing: 0.08em;
-      }
+      /* ── Misc ──────────────────────────────────────────── */
+      .log-entry { animation: dealIn .2s ease-out; }
+      #result-banner { pointer-events:none; transition: opacity .3s ease; }
+      .badge-status { font-size: .65rem; letter-spacing: .08em; }
 
       @keyframes glow {
-        0%, 100% { box-shadow: 0 0 6px 2px rgba(245,200,66,0.5); }
-        50%       { box-shadow: 0 0 18px 6px rgba(245,200,66,0.9); }
+        0%,100% { box-shadow: 0 0 6px 2px rgba(245,200,66,.5); }
+        50%      { box-shadow: 0 0 18px 6px rgba(245,200,66,.9); }
       }
       .chip-glow { animation: glow 1.8s ease-in-out infinite; }
     </style>
@@ -105,32 +148,36 @@
 
   <body class="h-full min-h-screen flex flex-col text-white select-none">
 
-    <!-- ══ HEADER ════════════════════════════════════════════════════════════ -->
-    <header class="flex items-center justify-between px-6 py-3 bg-black/30 backdrop-blur border-b border-felt-border">
+    <!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+    <header class="flex items-center justify-between px-5 py-2.5 bg-black/30 backdrop-blur border-b border-felt-border">
       <div class="flex items-center gap-3">
         <span class="text-2xl">🃏</span>
         <span class="font-bold text-xl tracking-widest text-chip-gold">MEGABIGWIN<span class="text-white opacity-60">777</span></span>
       </div>
       <div class="flex items-center gap-4 text-sm">
-        <!-- Connection status -->
         <div id="conn-status" class="flex items-center gap-2">
           <span id="conn-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-gray-500"></span>
           <span id="conn-label" class="text-gray-400 badge-status uppercase tracking-widest">Rozłączony</span>
         </div>
-        <!-- Chips counter -->
-        <div class="flex items-center gap-1.5 bg-black/40 rounded-full px-3 py-1 chip-glow" id="chips-badge">
+        <div class="flex items-center gap-1.5 bg-black/40 rounded-full px-3 py-1 chip-glow">
           <span class="text-chip-gold text-base">🪙</span>
           <span id="chips-display" class="font-bold text-chip-gold text-sm">–</span>
         </div>
       </div>
     </header>
 
-    <!-- ══ MAIN CONTENT ══════════════════════════════════════════════════════ -->
-    <main class="flex-1 flex flex-col items-center justify-between py-4 px-2 gap-4 overflow-hidden">
+    <!-- ══ ROOM STATUS BAR ══════════════════════════════════════════════════════ -->
+    <div id="room-status-bar" class="hidden w-full bg-black/20 border-b border-felt-border/50 px-5 py-1.5 flex items-center justify-between text-xs">
+      <span id="room-status-phase" class="font-semibold uppercase tracking-widest text-white/60"></span>
+      <span id="room-status-info"  class="text-white/40"></span>
+    </div>
 
-      <!-- ── DEALER SECTION ─────────────────────────────────────────────── -->
-      <section class="w-full max-w-2xl flex flex-col items-center gap-2">
-        <div class="flex items-center gap-3 mb-1">
+    <!-- ══ MAIN CONTENT ═════════════════════════════════════════════════════════ -->
+    <main class="flex-1 flex flex-col items-center justify-between py-3 px-2 gap-3 overflow-hidden">
+
+      <!-- ── DEALER ──────────────────────────────────────────────────────────── -->
+      <section class="w-full max-w-3xl flex flex-col items-center gap-2">
+        <div class="flex items-center gap-3 mb-0.5">
           <span class="text-xs uppercase tracking-widest text-white/50 font-semibold">Krupier</span>
           <div id="dealer-score-badge"
                class="hidden text-xs font-bold px-2.5 py-0.5 rounded-full bg-black/50 border border-white/20 text-white/80">
@@ -138,14 +185,13 @@
           </div>
         </div>
         <div id="dealer-hand"
-             class="flex flex-wrap justify-center gap-2 min-h-[108px] items-center">
-          <!-- Karty dealera renderowane dynamicznie -->
+             class="flex flex-wrap justify-center gap-2 min-h-[88px] items-center">
           <p class="text-white/25 text-sm italic">czekam na rozdanie…</p>
         </div>
       </section>
 
-      <!-- ── CENTER DIVIDER ─────────────────────────────────────────────── -->
-      <div class="w-full max-w-2xl">
+      <!-- ── STATUS PILL ─────────────────────────────────────────────────────── -->
+      <div class="w-full max-w-3xl">
         <div class="h-px bg-gradient-to-r from-transparent via-felt-border to-transparent"></div>
         <div class="flex items-center justify-center -mt-3">
           <div id="game-status-pill"
@@ -155,54 +201,39 @@
         </div>
       </div>
 
-      <!-- ── RESULT BANNER ──────────────────────────────────────────────── -->
+      <!-- ── RESULT BANNER ───────────────────────────────────────────────────── -->
       <div id="result-banner" class="hidden absolute inset-0 flex items-center justify-center z-10">
-        <div id="result-text"
-             class="text-6xl font-extrabold tracking-wider animate-result-pop drop-shadow-2xl">
-        </div>
+        <div id="result-text" class="text-6xl font-extrabold tracking-wider animate-result-pop drop-shadow-2xl"></div>
       </div>
 
-      <!-- ── PLAYER SECTION ─────────────────────────────────────────────── -->
-      <section class="w-full max-w-2xl flex flex-col items-center gap-2">
-        <div id="player-hand"
-             class="flex flex-wrap justify-center gap-2 min-h-[108px] items-center">
-          <p class="text-white/25 text-sm italic">twoje karty pojawią się tutaj…</p>
-        </div>
-        <div class="flex items-center gap-4 mt-1">
-          <div id="player-score-badge"
-               class="hidden text-sm font-bold px-3 py-1 rounded-full bg-black/50 border border-white/20 text-white/80">
-            <span id="player-score">0</span>
-          </div>
-          <div id="bet-badge"
-               class="hidden text-xs font-semibold px-3 py-1 rounded-full bg-chip-gold/20 border border-chip-gold/40 text-chip-gold">
-            Zakład: <span id="bet-display">0</span> 🪙
-          </div>
+      <!-- ── TABLE SLOTS (5 fixed seats) ────────────────────────────────────── -->
+      <!--
+        Rendered dynamically by renderer.ts → renderTableSlots()
+        Each slot gets data-slot-index="0..4"
+        Clicking an empty+joinable slot fires "slot-join" CustomEvent
+      -->
+      <section class="w-full max-w-3xl">
+        <div id="table-slots"
+             class="flex items-end justify-center gap-2 px-1 flex-wrap">
+          <!-- populated by JS -->
         </div>
       </section>
 
     </main>
 
-    <!-- ══ ACTION PANEL ══════════════════════════════════════════════════════ -->
-    <footer class="w-full bg-black/40 backdrop-blur border-t border-felt-border px-4 py-4">
-      <div class="max-w-2xl mx-auto flex flex-col gap-4">
+    <!-- ══ ACTION FOOTER ════════════════════════════════════════════════════════ -->
+    <footer class="w-full bg-black/40 backdrop-blur border-t border-felt-border px-4 py-3">
+      <div class="max-w-3xl mx-auto flex flex-col gap-3">
 
-        <!-- JOIN FORM -->
+        <!-- JOIN FORM (lobby) -->
         <div id="join-panel" class="flex flex-col sm:flex-row items-center gap-3">
-          <div class="flex-1 flex gap-2 w-full">
+          <div class="flex-1 flex gap-2 w-full flex-wrap">
             <input id="input-table-id"
-                   type="text"
-                   placeholder="Table ID (UUID lub dowolny)"
+                   type="text" placeholder="Table ID"
                    value="table-dev-001"
-                   class="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-chip-gold/60 focus:bg-white/15 transition" />
-            <input id="input-bet"
-                   type="number"
-                   placeholder="Zakład"
-                   value="50"
-                   min="1"
-                   class="w-24 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-chip-gold/60 focus:bg-white/15 transition" />
+                   class="flex-1 min-w-[130px] bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-chip-gold/60 focus:bg-white/15 transition" />
             <input id="input-player-id"
-                   type="text"
-                   placeholder="Player ID (UUID)"
+                   type="text" placeholder="Player ID (UUID)"
                    value=""
                    class="w-40 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-chip-gold/60 focus:bg-white/15 transition" />
           </div>
@@ -212,34 +243,64 @@
           </button>
         </div>
 
-        <!-- GAME ACTIONS -->
+        <!-- BET PANEL (shown when room=BETTING and player hasn't bet yet) -->
+        <div id="bet-panel" class="hidden flex-col gap-2">
+          <div class="flex items-center gap-2 text-xs text-white/50 uppercase tracking-widest">
+            <span>💰 Postaw zakład</span>
+            <span id="bet-range-hint" class="text-white/30"></span>
+          </div>
+          <div class="flex items-center gap-3">
+            <!-- Chip quick-select buttons -->
+            <div class="flex gap-2 flex-wrap">
+              <button data-chip="10"  class="btn-chip btn-action rounded-full w-10 h-10 text-xs font-bold bg-blue-700   border-2 border-blue-400  text-white shadow">10</button>
+              <button data-chip="25"  class="btn-chip btn-action rounded-full w-10 h-10 text-xs font-bold bg-red-700    border-2 border-red-400   text-white shadow">25</button>
+              <button data-chip="50"  class="btn-chip btn-action rounded-full w-10 h-10 text-xs font-bold bg-emerald-700 border-2 border-emerald-400 text-white shadow">50</button>
+              <button data-chip="100" class="btn-chip btn-action rounded-full w-12 h-12 text-xs font-bold bg-chip-gold   border-2 border-yellow-300 text-black shadow">100</button>
+              <button data-chip="250" class="btn-chip btn-action rounded-full w-10 h-10 text-xs font-bold bg-purple-700  border-2 border-purple-400 text-white shadow">250</button>
+            </div>
+            <input id="input-bet"
+                   type="number" placeholder="Własna kwota" min="10" max="500" value="50"
+                   class="w-28 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-chip-gold/60 focus:bg-white/15 transition" />
+            <div class="flex-1 flex items-center gap-2">
+              <button id="btn-place-bet"
+                      class="btn-action flex-1 bg-chip-gold text-black font-bold py-2.5 px-5 rounded-xl uppercase tracking-widest text-sm shadow-lg hover:bg-yellow-300">
+                POSTAW <span id="bet-confirm-amount" class="opacity-80"></span>
+              </button>
+            </div>
+          </div>
+          <!-- Waiting for others notice -->
+          <div id="waiting-for-others" class="hidden text-center text-xs text-white/40 italic py-1"></div>
+        </div>
+
+        <!-- GAME ACTIONS (PLAYING phase) -->
         <div id="action-panel" class="hidden flex-row items-center justify-center gap-3">
-          <button id="btn-hit"
-                  disabled
-                  class="btn-action flex-1 max-w-[140px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl uppercase tracking-widest text-sm shadow">
+          <button id="btn-hit"    disabled
+                  class="btn-action flex-1 max-w-[130px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl uppercase tracking-widest text-sm shadow">
             HIT
           </button>
-          <button id="btn-stand"
-                  disabled
-                  class="btn-action flex-1 max-w-[140px] bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded-xl uppercase tracking-widest text-sm shadow">
+          <button id="btn-stand"  disabled
+                  class="btn-action flex-1 max-w-[130px] bg-red-700    hover:bg-red-600    text-white font-bold py-3 rounded-xl uppercase tracking-widest text-sm shadow">
             STAND
           </button>
-          <button id="btn-double"
-                  disabled
-                  class="btn-action flex-1 max-w-[140px] bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl uppercase tracking-widest text-sm shadow">
+          <button id="btn-double" disabled
+                  class="btn-action flex-1 max-w-[130px] bg-amber-600  hover:bg-amber-500  text-white font-bold py-3 rounded-xl uppercase tracking-widest text-sm shadow">
             DOUBLE
           </button>
           <button id="btn-leave"
-                  class="btn-action flex-1 max-w-[120px] bg-white/10 hover:bg-white/20 border border-white/20 text-white/70 font-semibold py-3 rounded-xl uppercase tracking-widest text-xs shadow">
+                  class="btn-action max-w-[100px] flex-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white/70 font-semibold py-3 rounded-xl uppercase tracking-widest text-xs shadow">
             LEAVE
           </button>
         </div>
 
-        <!-- NEW GAME button (shown after FINISHED) -->
-        <div id="new-game-panel" class="hidden justify-center">
+        <!-- NEW ROUND (ROUND_OVER phase) -->
+        <div id="new-game-panel" class="hidden justify-center gap-3">
           <button id="btn-new-game"
                   class="btn-action bg-chip-gold text-black font-bold px-8 py-3 rounded-xl uppercase tracking-widest text-sm shadow-xl hover:bg-yellow-300">
-            🔄 Nowa Gra
+            🔄 Nowa Runda
+          </button>
+          <button id="btn-leave-after"
+                  class="btn-action bg-white/10 hover:bg-white/20 border border-white/20 text-white/70 font-semibold px-5 py-3 rounded-xl uppercase tracking-widest text-xs shadow">
+            LEAVE
           </button>
         </div>
 
@@ -249,8 +310,7 @@
             ▶ Logi sieciowe
           </summary>
           <div id="network-log"
-               class="mt-2 bg-black/50 rounded-lg p-3 h-32 overflow-y-auto flex flex-col gap-0.5 font-mono text-xs">
-            <!-- wpisy logów -->
+               class="mt-2 bg-black/50 rounded-lg p-3 h-28 overflow-y-auto flex flex-col gap-0.5 font-mono text-xs">
           </div>
         </details>
 

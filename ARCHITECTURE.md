@@ -66,7 +66,16 @@ Zbudować w pełni funkcjonalny symulator gry Blackjack działający w architekt
 - Wiele gier kasynowych (poker, ruletka itp.) — wykluczone.
 - Płatności realne, KYC, regulacje — wykluczone.
 - Mobile native app — wykluczone (responsywny web jest OK).
-- Multiplayer (wielu graczy przy jednym stole jednocześnie) — wykluczone w v1.
+- Multiplayer (wielu graczy przy jednym stole jednocześnie) — **zaimplementowane w v2** (branch `feat/multiplayer-rooms`).
+
+### Multiplayer — Decyzje Architektoniczne (v2, branch feat/multiplayer-rooms)
+
+1. **Model pokoju:** `InMemoryRoom` przechowuje `players: Map<playerId, RoomPlayer>`, wspólną talię i ręce dealera. Każdy gracz ma swój własny `InMemoryGame` (z kartami i zakładem), ale talia i krupier są wspólne.
+2. **Mechanika tur:** `turnOrder: string[]` + `activeTurnIndex: number` — gracze grają po kolei. Po akcji kończącej turę (STAND/BUST/DOUBLE_DOWN) `activeTurnIndex` wzrasta; gdy wszyscy skończą — dealer gra, wyniki rozstrzygnięte.
+3. **Broadcast ROOM_STATE:** po każdym `JOIN_GAME` i `PLAYER_ACTION` serwer broadcastuje `ROOM_STATE` do każdego `sessionId` w `roomSessions.get(tableId)`. Każdy gracz widzi karty i wyniki innych.
+4. **Prywatny GAME_STATE:** gracz dostaje też swój `GAME_STATE` z polem `availableActions` (tylko gdy to jego tura).
+5. **Nowy event `ROOM_STATE`:** dodany do protokołu WS (serwer → klient). Zawiera: `tableId`, `roomStatus`, `activePlayerId`, `dealerHand`, `players: Record<playerId, RoomPlayerState>`, `turnOrder`.
+6. **Limit graczy:** `TABLE_MAX_PLAYERS = 5` per stół.
 
 ---
 

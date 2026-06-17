@@ -79,3 +79,82 @@ export interface DomainError {
 export type Result<T, E = DomainError> =
   | { ok: true;  value: T }
   | { ok: false; error: E };
+
+// ─── Multiplayer — maszyna stanów pokoju ─────────────────────────────────────
+
+/**
+ * 4-stanowa maszyna stanów pokoju wieloosobowego.
+ *
+ *  WAITING_FOR_PLAYERS ──► (>=1 gracz dołącza) ──► BETTING
+ *  BETTING             ──► (wszyscy postawili zakłady) ──► PLAYING
+ *  PLAYING             ──► (wszyscy gracze skończyli tury + dealer) ──► ROUND_OVER
+ *  ROUND_OVER          ──► (nowa runda lub reset) ──► WAITING_FOR_PLAYERS
+ *
+ * Przejścia dozwolone tylko w podanej kolejności; dowolna akcja poza dozwolonym
+ * stanem zwraca INVALID_ACTION.
+ */
+export type RoomStatus =
+  | "WAITING_FOR_PLAYERS"  // pokój istnieje, czeka na graczy
+  | "BETTING"              // gracze siedzą, powinni postawić zakłady
+  | "PLAYING"              // runda w toku — tury graczy i dealera
+  | "ROUND_OVER";          // runda zakończona — wyniki znane, oczekiwanie na nową
+
+/**
+ * Przejścia dozwolone per zdarzenie (dokumentacja — nie runtime guard tutaj).
+ *
+ *  JOIN_ROOM  : WAITING_FOR_PLAYERS → BETTING  (gdy >=1 gracza)
+ *  PLACE_BET  : BETTING → BETTING (kolejny zakład) | BETTING → PLAYING (ostatni zakład)
+ *  PLAYER_ACTION: PLAYING → PLAYING | PLAYING → ROUND_OVER
+ *  JOIN_ROOM  : ROUND_OVER → WAITING_FOR_PLAYERS (nowa runda) lub RECONNECT
+ */
+export type RoomTransition =
+  | { from: "WAITING_FOR_PLAYERS"; event: "PLAYER_JOINED";  to: "BETTING"              }
+  | { from: "BETTING";             event: "BET_PLACED";     to: "BETTING"              }
+  | { from: "BETTING";             event: "ALL_BETS_IN";    to: "PLAYING"              }
+  | { from: "PLAYING";             event: "TURN_ADVANCED";  to: "PLAYING"              }
+  | { from: "PLAYING";             event: "ROUND_FINISHED"; to: "ROUND_OVER"           }
+  | { from: "ROUND_OVER";          event: "NEXT_ROUND";     to: "WAITING_FOR_PLAYERS"  };
+
+/**
+ * Stan pojedynczego miejsca przy stole (widoczny dla wszystkich w pokoju).
+ *
+ * Jeden gracz może zajmować wiele slotów (Multi-Hand).
+ * Kluczem w `RoomState.players` jest `seatKey = "${seatIndex}"` (0–4).
+ */
+export interface RoomPlayerState {
+  /** Unikalny klucz miejsca: indeks slotu 0–4 jako string */
+  seatKey: string;
+  /** Index slotu (0–4) — pozycja na stole od lewej */
+  seatIndex: number;
+  playerId: string;
+  username: string;
+  hand: Hand | null;
+  betAmount: number;
+  /** true = gracz złożył zakład w fazie BETTING */
+  hasBet: boolean;
+  result: GameResult;
+  chips: number;
+  isActivePlayer: boolean;
+  hasTurnEnded: boolean;
+  /** false = gracz rozłączony ale wciąż w grace period (30 s) */
+  isOnline: boolean;
+}
+
+/**
+ * Pełny stan pokoju rozsyłany broadcastem do wszystkich przy stole.
+ */
+export interface RoomState {
+  event: "ROOM_STATE";
+  v: "1";
+  tableId: string;
+  roomStatus: RoomStatus;
+  /** seatKey aktywnego gracza (null gdy dealer lub między rundami) */
+  activePlayerId: string | null;
+  /** Ręka krupiera — hole card ukryta podczas PLAYING; pełna w ROUND_OVER */
+  dealerHand: Hand | null;
+  /** Klucz: seatKey ("0"–"4"). Jeden playerId może mieć wiele wpisów (Multi-Hand). */
+  players: Record<string, RoomPlayerState>;
+  turnOrder: string[];
+  minBet: number;
+  maxBet: number;
+}

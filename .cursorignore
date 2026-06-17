@@ -1,0 +1,6 @@
+﻿node_modules/
+dist/
+.git/
+apps/web-client/node_modules/
+services/game-core/node_modules/
+gateway/ws/node_modules/

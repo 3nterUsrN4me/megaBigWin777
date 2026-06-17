@@ -7,7 +7,8 @@ const JWT_SECRET_RAW = process.env["JWT_SECRET"] ?? "dev-secret-for-testing-CHAN
 const SECRET_BYTES = new TextEncoder().encode(JWT_SECRET_RAW);
 
 export interface JwtPayload {
-  sub: string;  // playerId
+  sub: string;      // playerId
+  username?: string; // display name (optional, falls back to playerId)
   exp?: number;
   iat?: number;
 }

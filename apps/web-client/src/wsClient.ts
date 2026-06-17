@@ -1,4 +1,15 @@
-import type { ServerMessage, PingMsg, JoinGameMsg, PlayerActionMsg, LeaveGameMsg } from "./types.js";
+import type {
+  ServerMessage,
+  PingMsg,
+  JoinRoomMsg,
+  JoinSlotMsg,
+  PlaceBetMsg,
+  ReconnectMsg,
+  JoinGameMsg,
+  PlayerActionMsg,
+  LeaveGameMsg,
+  PlayerActionType,
+} from "./types.js";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -18,12 +29,26 @@ export interface WsClientCallbacks {
   onLog:        (text: string, level?: "info" | "warn" | "error") => void;
 }
 
+/**
+ * Resolvers read live UI state so every outbound message targets the correct slot.
+ * Wired from main.ts against the game store.
+ */
+export interface WsClientSlotResolvers {
+  /** Slot whose turn is active (highlighted) — used for HIT / STAND / DOUBLE */
+  getActiveSeatIndex: () => number | null;
+  /** gameId stored on that slot after DEAL */
+  getGameIdForSeat: (seatIndex: number) => string | null;
+  /** Slot selected for the next PLACE_BET (one bet per click) */
+  getSelectedBetSeatIndex: () => number | null;
+}
+
 // ─── WsClient ─────────────────────────────────────────────────────────────────
 
 export class WsClient {
   private ws: WebSocket | null = null;
   private token: string;
   private callbacks: WsClientCallbacks;
+  private slotResolvers: WsClientSlotResolvers | null = null;
 
   private pingIntervalId: ReturnType<typeof setInterval> | null = null;
   private pongTimeoutId:  ReturnType<typeof setTimeout>  | null = null;
@@ -35,6 +60,11 @@ export class WsClient {
     this.callbacks = callbacks;
   }
 
+  /** Connect store resolvers — call once after construction */
+  setSlotResolvers(resolvers: WsClientSlotResolvers): void {
+    this.slotResolvers = resolvers;
+  }
+
   // ── Public API ──────────────────────────────────────────────────────────────
 
   connect(): void {
@@ -43,11 +73,6 @@ export class WsClient {
     this.intentionalClose = false;
     this.log(`Łączę z ${WS_URL}…`);
 
-    // Native WebSocket doesn't support custom headers — we pass the JWT
-    // as a subprotocol token trick OR via query param for local dev.
-    // The gateway reads Authorization header during HTTP Upgrade;
-    // Vite's dev server proxy can inject it, but for direct connection
-    // we use a query parameter that the gateway also accepts.
     const url = `${WS_URL}?token=${encodeURIComponent(this.token)}`;
 
     try {
@@ -72,16 +97,66 @@ export class WsClient {
     }
   }
 
-  sendJoin(msg: Omit<JoinGameMsg, "event" | "v">): void {
-    this.send({ event: "JOIN_GAME", v: "1", ...msg });
+  sendJoinRoom(tableId: string): void {
+    this.send({ event: "JOIN_ROOM", v: "1", tableId } satisfies JoinRoomMsg);
   }
 
-  sendAction(msg: Omit<PlayerActionMsg, "event" | "v">): void {
+  sendJoinSlot(tableId: string, seatIndex: number): void {
+    this.send({ event: "JOIN_SLOT", v: "1", tableId, seatIndex } satisfies JoinSlotMsg);
+  }
+
+  /**
+   * Place a bet on exactly one slot.
+   * Uses explicit seatIndex or the store's selected bet slot.
+   */
+  sendPlaceBet(tableId: string, betAmount: number, seatIndex?: number): void {
+    const resolved =
+      seatIndex ??
+      this.slotResolvers?.getSelectedBetSeatIndex() ??
+      null;
+
+    if (resolved === null) {
+      this.log("PLACE_BET — wybierz slot (kliknij miejsce przy stole)", "warn");
+      return;
+    }
+
+    this.send({
+      event: "PLACE_BET",
+      v: "1",
+      tableId,
+      betAmount,
+      seatIndex: resolved,
+    } satisfies PlaceBetMsg);
+  }
+
+  sendReconnect(tableId: string): void {
+    this.send({ event: "RECONNECT", v: "1", tableId } satisfies ReconnectMsg);
+  }
+
+  sendJoin(msg: Omit<JoinGameMsg, "event" | "v">): void {
+    this.send({ event: "JOIN_GAME", v: "1", ...msg } satisfies JoinGameMsg);
+  }
+
+  /** HIT on the currently active (highlighted) slot */
+  sendHit(): void {
+    this._sendPlayerAction("HIT");
+  }
+
+  /** STAND on the currently active (highlighted) slot */
+  sendStand(): void {
+    this._sendPlayerAction("STAND");
+  }
+
+  sendDoubleDown(): void {
+    this._sendPlayerAction("DOUBLE_DOWN");
+  }
+
+  sendAction(msg: Omit<PlayerActionMsg, "event" | "v"> & { seatIndex: number }): void {
     this.send({ event: "PLAYER_ACTION", v: "1", ...msg });
   }
 
-  sendLeave(gameId: string): void {
-    this.send({ event: "LEAVE_GAME", v: "1", gameId } satisfies LeaveGameMsg);
+  sendLeave(tableId: string): void {
+    this.send({ event: "LEAVE_GAME", v: "1", tableId } satisfies LeaveGameMsg);
   }
 
   isConnected(): boolean {
@@ -90,6 +165,30 @@ export class WsClient {
 
   updateToken(newToken: string): void {
     this.token = newToken;
+  }
+
+  // ── Player action (always uses active highlighted slot) ───────────────────
+
+  private _sendPlayerAction(action: PlayerActionType): void {
+    const seatIndex = this.slotResolvers?.getActiveSeatIndex() ?? null;
+    if (seatIndex === null) {
+      this.log(`${action} — brak aktywnego slotu (to nie Twoja tura?)`, "warn");
+      return;
+    }
+
+    const gameId = this.slotResolvers?.getGameIdForSeat(seatIndex) ?? null;
+    if (!gameId) {
+      this.log(`${action} — brak gameId dla slotu ${seatIndex}`, "warn");
+      return;
+    }
+
+    this.sendAction({
+      gameId,
+      action,
+      idempotencyKey: crypto.randomUUID(),
+      seatIndex,
+    });
+    this.log(`→ PLAYER_ACTION ${action} (seat ${seatIndex})`, "info");
   }
 
   // ── Private handlers ────────────────────────────────────────────────────────
@@ -117,10 +216,8 @@ export class WsClient {
       return;
     }
 
-    // Reset pong timeout on any server message — server is alive
     this.resetPongTimeout();
 
-    // Handle PONG specifically for heartbeat tracking
     if (parsed.event === "PONG") {
       this.log(`← PONG (${Date.now() - parsed.timestamp} ms)`, "info");
     }
@@ -146,8 +243,6 @@ export class WsClient {
     this.log("Błąd WebSocket", "error");
     this.callbacks.onError(event);
   };
-
-  // ── Heartbeat ────────────────────────────────────────────────────────────────
 
   private startHeartbeat(): void {
     this.stopHeartbeat();
@@ -180,8 +275,6 @@ export class WsClient {
     }, PONG_TIMEOUT_MS);
   }
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-
   private send(data: unknown): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       this.log("Nie można wysłać — brak połączenia", "warn");
@@ -194,8 +287,6 @@ export class WsClient {
     this.callbacks.onLog(text, level);
   }
 }
-
-// ─── Type guard ───────────────────────────────────────────────────────────────
 
 function isServerMessage(v: unknown): v is ServerMessage {
   if (typeof v !== "object" || v === null) return false;
