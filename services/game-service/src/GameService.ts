@@ -108,6 +108,23 @@ export class GameService {
     });
   }
 
+  /** Creates the player row when missing (called on JOIN_ROOM / JOIN_SLOT). */
+  async ensurePlayer(playerId: string, username: string) {
+    return this.db.transaction(async (tx) => {
+      return this.playerRepo.findOrCreate(tx, playerId, username);
+    });
+  }
+
+  /** Creates the table row when missing (called before first bet at a table). */
+  async ensureTable(tableId: string) {
+    return this.db.transaction(async (tx) => {
+      return this.gameRepo.ensureTable(tx, tableId, {
+        minBet: 10,
+        maxBet: 500,
+      });
+    });
+  }
+
   async reserveBet(
     playerId: string,
     betAmount: number,
@@ -203,7 +220,11 @@ export class GameService {
 
         const player = await this.playerRepo.findById(tx, seat.playerId);
         if (!player) {
-          throw new Error(`Player ${seat.playerId} not found`);
+          return {
+            ok: false,
+            code: "GAME_NOT_FOUND",
+            message: `Player ${seat.playerId} not found`,
+          };
         }
 
         let persistedGame = game;
@@ -343,12 +364,23 @@ export class GameService {
     | ServiceError
   > {
     return this.db.transaction(async (tx) => {
-      const activeGames = await this.gameRepo.findAllActiveByTable(tx, tableId);
-      if (activeGames.length === 0) {
-        return { ok: false, code: "GAME_NOT_FOUND", message: "No active games at table" };
+      const roundGames = await this.gameRepo.findCurrentRoundByTable(tx, tableId);
+      if (roundGames.length === 0) {
+        return { ok: false, code: "GAME_NOT_FOUND", message: "No games found for current table round" };
       }
 
-      const anchor = activeGames[0]!;
+      const stillInTurn = roundGames.filter((g) => g.status === "PLAYER_TURN");
+      if (stillInTurn.length > 0) {
+        return {
+          ok: false,
+          code: "INVALID_ACTION",
+          message: "Not all player turns are complete",
+        };
+      }
+
+      const anchor = roundGames.reduce((shortest, game) =>
+        game.deckState.length < shortest.deckState.length ? game : shortest,
+      );
       const standResult = applyStand(anchor.deckState, anchor.dealerHand);
       if (!standResult.ok) {
         return {
@@ -362,7 +394,7 @@ export class GameService {
       const deckState = standResult.value.remainingDeck;
       const resolved: GameStateView[] = [];
 
-      for (const game of activeGames) {
+      for (const game of roundGames) {
         let next = game;
         if (game.result === null) {
           const result = determineResult(game.playerHand, dealerHand);
@@ -404,7 +436,7 @@ export class GameService {
 
   async loadGameViewsByTable(tableId: string): Promise<GameStateView[]> {
     return this.db.transaction(async (tx) => {
-      const rows = await this.gameRepo.findAllActiveByTable(tx, tableId);
+      const rows = await this.gameRepo.findCurrentRoundByTable(tx, tableId);
       const views: GameStateView[] = [];
       for (const row of rows) {
         const player = await this.playerRepo.findById(tx, row.playerId);

@@ -1,6 +1,7 @@
 import type { WebSocket } from "ws";
 import type { Card, GameResult, GameStatus, PlayerActionType } from "../../../contracts/domain.js";
 import type { DbGameService } from "./gameService/DbGameService.js";
+import type { HeartbeatManager } from "./heartbeat/heartbeatManager.js";
 
 export interface ClientSession {
   sessionId: string;
@@ -25,6 +26,7 @@ export type ErrorCode =
 export interface WsHandlerContext {
   session:      ClientSession;
   gameService:  DbGameService;
+  heartbeat:    HeartbeatManager;
   sessions:     Map<string, ClientSession>;
   roomSessions: Map<string, Set<string>>;
 }

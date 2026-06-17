@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import type { Card } from "../../../../contracts/domain";
 import { games, rounds, tables, type GameRow } from "../db/schema.js";
 import type { Transaction } from "../db/client.js";
@@ -94,6 +94,35 @@ export class GameRepository {
         and(
           eq(games.tableId, tableId),
           ne(games.status, "FINISHED"),
+        ),
+      );
+  }
+
+  /**
+   * Returns every hand in the current table round (shared deckSeed).
+   * Includes FINISHED hands awaiting dealer resolution (STAND / deferred DOUBLE_DOWN)
+   * alongside busted or blackjack hands already settled at the player phase.
+   */
+  async findCurrentRoundByTable(
+    tx: Transaction,
+    tableId: string,
+  ): Promise<GameRow[]> {
+    const [latest] = await tx
+      .select()
+      .from(games)
+      .where(eq(games.tableId, tableId))
+      .orderBy(desc(games.createdAt))
+      .limit(1);
+
+    if (!latest) return [];
+
+    return tx
+      .select()
+      .from(games)
+      .where(
+        and(
+          eq(games.tableId, tableId),
+          eq(games.deckSeed, latest.deckSeed),
         ),
       );
   }
@@ -197,5 +226,36 @@ export class GameRepository {
       .where(eq(tables.id, tableId))
       .limit(1);
     return row;
+  }
+
+  /**
+   * Ensures a blackjack table row exists before multiplayer rounds are dealt.
+   */
+  async ensureTable(
+    tx: Transaction,
+    tableId: string,
+    defaults?: { name?: string; minBet?: number; maxBet?: number },
+  ) {
+    const existing = await this.findTable(tx, tableId);
+    if (existing) return existing;
+
+    const [row] = await tx
+      .insert(tables)
+      .values({
+        id: tableId,
+        name: defaults?.name ?? `Table ${tableId.slice(0, 8)}`,
+        status: "WAITING",
+        minBet: defaults?.minBet ?? 10,
+        maxBet: defaults?.maxBet ?? 500,
+      })
+      .returning();
+
+    if (row) return row;
+
+    const refetched = await this.findTable(tx, tableId);
+    if (!refetched) {
+      throw new Error(`Failed to create table ${tableId}`);
+    }
+    return refetched;
   }
 }

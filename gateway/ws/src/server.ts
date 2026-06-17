@@ -92,6 +92,7 @@ export async function buildServer() {
           void routeMessage(rawData, {
             session,
             gameService,
+            heartbeat,
             sessions,
             roomSessions,
           }).catch((err) => {

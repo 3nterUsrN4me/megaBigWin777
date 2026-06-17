@@ -12,10 +12,11 @@ export function handlePing(
   msg: PingMessage,
   ctx: WsHandlerContext
 ): void {
-  const { session } = ctx;
+  const { session, heartbeat } = ctx;
 
-  // Refresh heartbeat
+  // Refresh heartbeat timers (HeartbeatManager sweep + session metadata)
   session.lastPingAt = Date.now();
+  heartbeat.ping(session.sessionId);
 
   sendJson(session.ws, {
     event: "PONG",

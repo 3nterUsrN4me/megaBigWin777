@@ -216,10 +216,10 @@ export class WsClient {
       return;
     }
 
-    this.resetPongTimeout();
-
     if (parsed.event === "PONG") {
-      this.log(`← PONG (${Date.now() - parsed.timestamp} ms)`, "info");
+      this.resetPongTimeout();
+      this.log(`← PONG (${Date.now() - (parsed.timestamp ?? Date.now())} ms)`, "info");
+      return;
     }
 
     this.callbacks.onMessage(parsed);
@@ -271,7 +271,7 @@ export class WsClient {
     if (this.pongTimeoutId !== null) clearTimeout(this.pongTimeoutId);
     this.pongTimeoutId = setTimeout(() => {
       this.log("Heartbeat timeout — brak odpowiedzi serwera. Zamykam.", "error");
-      this.ws?.close(1001, "Heartbeat timeout");
+      this.ws?.close(1000, "Heartbeat timeout");
     }, PONG_TIMEOUT_MS);
   }
 
