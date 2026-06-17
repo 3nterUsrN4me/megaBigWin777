@@ -29,14 +29,24 @@ export async function verifyJwt(token: string): Promise<JwtPayload | null> {
 }
 
 /**
- * Extracts the Bearer token from an `Authorization` header.
- * Returns `null` if the header is absent or malformed.
+ * Extracts the Bearer token from an `Authorization` header
+ * or from the `?token=` query parameter (browser WebSocket fallback —
+ * browsers cannot set custom headers during WS Upgrade).
+ * Returns `null` if neither is present or malformed.
  */
 export function extractBearerToken(request: FastifyRequest): string | null {
+  // 1. Standard Authorization header (Node.js clients, tests)
   const auth = request.headers["authorization"];
-  if (typeof auth !== "string" || !auth.startsWith("Bearer ")) return null;
-  const token = auth.slice(7).trim();
-  return token.length > 0 ? token : null;
+  if (typeof auth === "string" && auth.startsWith("Bearer ")) {
+    const token = auth.slice(7).trim();
+    if (token.length > 0) return token;
+  }
+
+  // 2. Query parameter fallback for browser WebSocket clients
+  const qToken = (request.query as Record<string, unknown>)["token"];
+  if (typeof qToken === "string" && qToken.length > 0) return qToken;
+
+  return null;
 }
 
 /**
