@@ -1,0 +1,86 @@
+services:
+  # 1. Baza danych PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: mgrad-postgres
+    environment:
+      POSTGRES_USER: blackjack_admin
+      POSTGRES_PASSWORD: secret_blackjack_pass123
+      POSTGRES_DB: blackjack_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blackjack_admin -d blackjack_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Cache i Sesje - Redis
+  redis:
+    image: redis:7-alpine
+    container_name: mgrad-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 3. Krok instalacji paczek (czysty node_modules)
+  installer:
+    image: node:22-alpine
+    container_name: mgrad-installer
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules_docker:/app/node_modules
+    command: npm install
+
+  # 4. Backend - WebSocket Gateway (wystawiony na port 3001 z Twojej konfiguracji)
+  gateway:
+    image: node:22-alpine
+    container_name: mgrad-backend
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules_docker:/app/node_modules
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=postgres://blackjack_admin:secret_blackjack_pass123@postgres:5432/blackjack_db
+      - REDIS_URL=redis://redis:6379
+      - PORT=3001
+      - HOST=0.0.0.0
+      - JWT_SECRET=dev-secret-for-testing-CHANGE-IN-PROD!!
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      installer:
+        condition: service_completed_successfully
+    command: sh -c "npm run db:migrate --workspace=@megabigwin777/game-service && npm run dev --workspace=@megabigwin777/ws-gateway"
+
+  # 5. Frontend - Web Client (wystawiony standardowo)
+  frontend:
+    image: node:22-alpine
+    container_name: mgrad-frontend
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules_docker:/app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      installer:
+        condition: service_completed_successfully
+      gateway:
+        condition: service_started
+    command: sh -c "npm run dev --workspace=@megabigwin777/web-client -- --host 0.0.0.0"
+
+volumes:
+  pgdata:
+  node_modules_docker:

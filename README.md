@@ -1,1 +1,1 @@
-# megaBigWin777
+# megaBigWin777 | for testing: docker compose up -d --build
